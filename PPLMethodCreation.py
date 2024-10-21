@@ -187,15 +187,35 @@ class DUT_Variables(CI_Variables):
 ################################# PARSING
 ############################################################################
 
-def NewParseNodes(node):
+
+def NodeChildCheck(node):
+    # Recursively check children
+    children = node.get_children(True)
+    
+    if len(children) == 0:
+        # adds to checked list if there are no children of this node
+        checked_set.add(node.guid)
+    else:
+        all_checked = True
+        for child in children:
+            if child.guid not in checked_set:
+                all_checked = False
+                ParseNodes(child)
+        
+        if all_checked:
+            # adds to checked list if all children have been checked
+            checked_set.add(node.guid)
+
+
+def ParseNodes(node):
     skip = True
     name = None
+    
+    if node.guid in checked_set:
+        return
 
     if node.type in [POUGuid, DUTGuid]:
         name = node.get_name()
-
-        if name in checked_set:
-            return
 
         skip = False
         declaration = node.textual_declaration.text
@@ -228,12 +248,7 @@ def NewParseNodes(node):
                     dut_nodes.append(node)
                     dut_set.add(name)
 
-    # Recursively check children
-    for child in node.get_children(True):
-        NewParseNodes(child)
-
-    if name:
-        checked_set.add(name)
+    NodeChildCheck(node)
 
 
 def BuildExtendedDict():
@@ -464,51 +479,6 @@ def DUTTreeCheck():
             changed = True
 
     return changed
-
-
-def Parse_POU_CI_Variables(POU):
-    pou_variables = CI_Variables()
-    declaration = POU.textual_declaration
-
-    for i in range(0, declaration.linecount):
-        line = declaration.get_line(i)
-        if "_CI" in line:
-            # Extract variable name and data type
-
-            parts = line.split(":")
-
-            if len(parts) >= 2:
-                variable_name = parts[0].strip()
-
-                # stop if it's been commented out
-                if variable_name[0:2] == "//":
-                    continue
-
-                # stop if the first group is not the config variable
-                if "_CI" not in variable_name:
-                    continue
-
-                # remove last 3 characters _CI from variable name for friendly name
-                friendly_name = variable_name[:-3]
-
-                data_type = parts[1].strip()
-
-                # converts STRING(###) to STRING
-                data_type = data_type.split("(")[0]
-
-                # removes trailing semicolon
-                data_type = data_type.split(";")[0]
-
-                valid = data_type in valid_dtypes
-
-                pou_variables.add_variable(
-                    variable_name, data_type, friendly_name, valid
-                )
-
-    if pou_variables.variable_count() > 0:
-        return pou_variables
-    else:
-        return False
 
 
 def Parse_CI_Variables(POU):
@@ -1161,7 +1131,6 @@ def Create_Extended_Methods(POU):
     eDebugPrint("Creating extended methods for {}".format(name))
 
     Remove_Unfoldered_Methods(POU)
-    # POU_Variables = Parse_POU_CI_Variables(POU)
     POU_Variables = Parse_CI_Variables(POU)
 
     if not POU_Variables:
@@ -1202,7 +1171,7 @@ all_nodes = proj.get_children(True)
 
 debugPrint("Collect all EXTENDed")
 for node in all_nodes:
-    NewParseNodes(node)
+    ParseNodes(node)
 
 if extendedDebug:
     for name in dut_set:
