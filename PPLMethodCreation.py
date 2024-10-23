@@ -63,7 +63,6 @@ dut_nodes = []
 
 extends_set = set()
 implements_set = set()
-checked_set = set()
 extends_dict = {}
 root_names = set()
 leaf_names = set()
@@ -188,31 +187,9 @@ class DUT_Variables(CI_Variables):
 ############################################################################
 
 
-def NodeChildCheck(node):
-    # Recursively check children
-    children = node.get_children(True)
-    
-    if len(children) == 0:
-        # adds to checked list if there are no children of this node
-        checked_set.add(node.guid)
-    else:
-        all_checked = True
-        for child in children:
-            if child.guid not in checked_set:
-                all_checked = False
-                ParseNodes(child)
-        
-        if all_checked:
-            # adds to checked list if all children have been checked
-            checked_set.add(node.guid)
-
-
 def ParseNodes(node):
     skip = True
     name = None
-    
-    if node.guid in checked_set:
-        return
 
     if node.type in [POUGuid, DUTGuid]:
         name = node.get_name()
@@ -225,7 +202,7 @@ def ParseNodes(node):
                 skip = False
             else:
                 skip = True
-                debugPrint("Skipping")
+                debugPrint("Skipping {}".format(name))
 
     if not skip:
         if node.type == POUGuid:
@@ -247,8 +224,6 @@ def ParseNodes(node):
                     eDebugPrint("Found DUT: {}".format(name))
                     dut_nodes.append(node)
                     dut_set.add(name)
-
-    NodeChildCheck(node)
 
 
 def BuildExtendedDict():
